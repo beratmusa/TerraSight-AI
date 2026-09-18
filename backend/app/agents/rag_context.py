@@ -29,7 +29,7 @@ class RAGContextAgent:
                     "content": "New tax incentives for buyers in emerging districts like Arjan."
                 }
             ],
-            "context_summary": "JVC'de altyapı gelişimi planlanırken, Arjan yeni vergi teşvikleriyle öne çıkıyor."
+            "context_summary": "Infrastructure development is planned for JVC, while Arjan stands out with new tax incentives."
         }
 
 rag_context_agent = RAGContextAgent()

@@ -22,7 +22,7 @@ const data = [
 export default function PredictionChart() {
   return (
     <div className="w-full h-[300px] bg-slate-900 border border-slate-800 rounded-xl p-4">
-      <h3 className="text-sm font-medium text-slate-400 mb-4">5 Yıllık Fiyat Tahminleri (AED)</h3>
+      <h3 className="text-sm font-medium text-slate-400 mb-4">5-Year Price Predictions (AED)</h3>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />

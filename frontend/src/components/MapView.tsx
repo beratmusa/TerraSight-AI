@@ -111,12 +111,12 @@ export default function MapView() {
       
       {/* Harita Üzeri Bilgi Kutucuğu (Legend) */}
       <div className="absolute top-4 left-4 bg-slate-900/80 p-3 rounded-lg border border-slate-700 backdrop-blur-sm text-sm text-white">
-        <h3 className="font-semibold mb-2">Değerlenme Yoğunluğu</h3>
+        <h3 className="font-semibold mb-2">Appreciation Density</h3>
         <div className="flex flex-col gap-1 w-32">
           <div className="h-3 w-full rounded bg-gradient-to-r from-[rgba(33,102,172,0)] via-[rgb(253,219,199)] to-[rgb(178,24,43)]"></div>
           <div className="flex justify-between text-xs text-slate-400 mt-1">
-            <span>Düşük</span>
-            <span>Yüksek</span>
+            <span>Low</span>
+            <span>High</span>
           </div>
         </div>
       </div>

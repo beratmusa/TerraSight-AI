@@ -78,11 +78,11 @@ async def run_orchestrator_stream(query: str, budget: float = None, preferences:
     await asyncio.sleep(1)
     
     final_synthesis = (
-        f"Veriler sentezlendi. Bütçeniz ({budget} AED) dahilinde yapılan analize göre:\n"
+        f"Data synthesis complete. Based on your budget of {budget} AED:\n"
         f"- {state['rag_context']['context_summary']}\n"
-        f"- JVC için beklenen 5 yıllık artış: %{prediction_results[0]['predictions']['5_year_appreciation_pct']}\n"
-        f"- Arjan için beklenen 5 yıllık artış: %{prediction_results[1]['predictions']['5_year_appreciation_pct']}\n"
-        "Uzun vadeli yatırım için JVC, kısa vadeli teşvikler için Arjan tercih edilebilir."
+        f"- Expected 5-year appreciation for JVC: +{prediction_results[0]['predictions']['5_year_appreciation_pct']}%\n"
+        f"- Expected 5-year appreciation for Arjan: +{prediction_results[1]['predictions']['5_year_appreciation_pct']}%\n"
+        "JVC is recommended for long-term holding due to infrastructure plans, while Arjan may benefit from short-term incentives."
     )
     
     state["final_response"] = final_synthesis
