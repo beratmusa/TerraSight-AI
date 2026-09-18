@@ -1,38 +1,58 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from app.agents.orchestrator import run_orchestrator
+import os
+import joblib
+from app.agents.orchestrator import run_orchestrator_stream
 
 app = FastAPI(title="TerraSight AI Backend", version="0.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class QueryRequest(BaseModel):
     query: str
     budget: float | None = None
     preferences: list[str] | None = None
 
-class QueryResponse(BaseModel):
-    answer: str
-    prediction_data: dict | None = None
-    context_data: dict | None = None
-
 @app.get("/")
 def read_root():
     return {"message": "Welcome to TerraSight AI API"}
 
-@app.post("/agent-query", response_model=QueryResponse)
+@app.get("/health")
+def check_health():
+    """Modelin yüklü olup olmadığını kontrol eden health check."""
+    model_path = os.path.join("app", "models", "artifacts", "price_prediction_model.joblib")
+    is_model_loaded = os.path.exists(model_path)
+    
+    # Gerçekten yükleyip test etmek isterseniz:
+    # try:
+    #     joblib.load(model_path)
+    # except Exception as e:
+    #     return {"status": "error", "message": f"Model load failed: {str(e)}"}
+        
+    if is_model_loaded:
+        return {"status": "ok", "model_loaded": True}
+    else:
+        return {"status": "warning", "model_loaded": False, "message": "Model not found."}
+
+@app.post("/agent-query")
 async def process_agent_query(request: QueryRequest):
     """
-    Kullanıcıdan gelen isteği (Örn: "500k AED bütçem var, JVC mi Arjan mı?") 
-    Orkestratör Ajan'a (Supervisor) yönlendirir.
+    Kullanıcı isteğini Orchestrator'a iletir ve her alt ajanın tamamlanma
+    durumunu SSE (Server-Sent Events) ile stream eder.
     """
     try:
-        # Orkestratör Ajanı çalıştırıyoruz.
-        # Bu fonksiyon, LangGraph veya CrewAI ile alt ajanları (Subagents) koordine eder.
-        result = await run_orchestrator(request.query, request.budget, request.preferences)
-        
-        return QueryResponse(
-            answer=result.get("answer", "No answer found"),
-            prediction_data=result.get("prediction_data"),
-            context_data=result.get("context_data")
+        # run_orchestrator_stream artık bir async generator dönüyor
+        return StreamingResponse(
+            run_orchestrator_stream(request.query, request.budget, request.preferences),
+            media_type="text/event-stream"
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

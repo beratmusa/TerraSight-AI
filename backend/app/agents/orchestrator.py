@@ -1,65 +1,100 @@
 import asyncio
-from typing import Dict, Any, List
+import json
+from typing import Dict, Any, List, TypedDict
 
 from app.agents.data_retrieval import data_retrieval_agent
 from app.agents.ml_prediction import ml_prediction_agent
 from app.agents.rag_context import rag_context_agent
 
-async def run_orchestrator(query: str, budget: float = None, preferences: List[str] = None) -> Dict[str, Any]:
+# LangGraph için kullanılacak State Şeması
+class AgentState(TypedDict):
+    query: str
+    budget: float | None
+    preferences: List[str] | None
+    retrieved_data: Dict[str, Any]
+    ml_prediction: Dict[str, Any]
+    rag_context: Dict[str, Any]
+    final_response: str | None
+
+async def run_orchestrator_stream(query: str, budget: float = None, preferences: List[str] = None):
     """
-    Yönetici Ajan (Orchestrator Agent / Supervisor)
-    Görev: Kullanıcı isteğini ("500k AED bütçem var, JVC mi Arjan mı?") alt ajanlara dağıtır, 
-    sayısal tahminler ile RAG'dan gelen bağlamsal bilgileri sentezleyerek 
-    yapılandırılmış bir JSON döndürür.
-    
-    Not: Bu örnek, ajanların basit fonksiyon çağrıları şeklinde orkestre edildiği bir yapıdır.
-    Gerçek bir MVP'de burası LangGraph (StateGraph) veya CrewAI ile bir workflow'a dönüştürülmelidir.
+    Kullanıcı isteğini alt ajanlara dağıtır.
+    İşlem sürdükçe SSE (Server-Sent Events) için yield ile durum güncellemeleri gönderir.
     """
     
-    print(f"OrchestratorAgent: Yeni sorgu alındı -> '{query}'")
+    # State'i ilklendir
+    state: AgentState = {
+        "query": query,
+        "budget": budget,
+        "preferences": preferences,
+        "retrieved_data": {},
+        "ml_prediction": {},
+        "rag_context": {},
+        "final_response": None
+    }
     
-    # 1. RAG Ajanı ile Genel Bağlamı (Context) Çıkar
-    # Kullanıcının sorusundaki JVC veya Arjan gibi yerler için master plan veya regülasyonları analiz et
-    rag_result = rag_context_agent.retrieve_context(query)
+    # 1. Başlangıç Bildirimi
+    yield f"data: {json.dumps({'status': 'Analyzing query...', 'step': 'init'})}\n\n"
+    await asyncio.sleep(1) # Simülasyon için bekleme
     
-    # NLP ile lokasyonların çıkarıldığını varsayıyoruz (Mock NLP çıkarımı)
+    # 2. RAG Bağlamı (Context)
+    yield f"data: {json.dumps({'status': 'RAG Agent searching regulations...', 'step': 'rag'})}\n\n"
+    state["rag_context"] = rag_context_agent.retrieve_context(state["query"])
+    await asyncio.sleep(1)
+    
+    # NLP ile lokasyonların çıkarıldığını varsayıyoruz
     locations_to_analyze = ["JVC", "Arjan"]
-    
     prediction_results = []
     
+    # 3. Data Retrieval & ML Prediction
     for loc in locations_to_analyze:
-        # 2. Veri Ajanı ile Geçmiş Verileri Çek
+        yield f"data: {json.dumps({'status': f'Data Retrieval Agent fetching transactions for {loc}...', 'step': 'data'})}\n\n"
         historical_data = data_retrieval_agent.fetch_historical_prices(loc)
         geo_data = data_retrieval_agent.fetch_geographic_metrics(loc)
         
-        # 3. ML Tahmin Ajanı ile Gelecek Fiyatları Tahmin Et
+        state["retrieved_data"][loc] = {
+            "historical": historical_data,
+            "geo": geo_data
+        }
+        await asyncio.sleep(0.5)
+        
+        yield f"data: {json.dumps({'status': f'ML Agent predicting 5-year ROI for {loc}...', 'step': 'ml'})}\n\n"
         ml_prediction = ml_prediction_agent.predict_appreciation(
             location=loc, 
             historical_data=historical_data
         )
         
+        state["ml_prediction"][loc] = ml_prediction
         prediction_results.append({
             "location": loc,
             "current_metrics": historical_data,
             "geo_data": geo_data,
             "predictions": ml_prediction["predictions"]
         })
+        await asyncio.sleep(0.5)
     
-    # 4. LLM (Orkestratörün Son Sentezi) 
-    # Normalde burada OpenAI / Anthropic API çağrısı yapılarak tüm veriler (RAG + ML + Veri)
-    # bir araya getirilip kullanıcıya mantıklı bir yanıt üretilir.
+    # 4. Sentez (LLM)
+    yield f"data: {json.dumps({'status': 'Orchestrator Agent synthesizing final response...', 'step': 'synthesis'})}\n\n"
+    await asyncio.sleep(1)
     
     final_synthesis = (
         f"Veriler sentezlendi. Bütçeniz ({budget} AED) dahilinde yapılan analize göre:\n"
-        f"- {rag_result['context_summary']}\n"
+        f"- {state['rag_context']['context_summary']}\n"
         f"- JVC için beklenen 5 yıllık artış: %{prediction_results[0]['predictions']['5_year_appreciation_pct']}\n"
         f"- Arjan için beklenen 5 yıllık artış: %{prediction_results[1]['predictions']['5_year_appreciation_pct']}\n"
         "Uzun vadeli yatırım için JVC, kısa vadeli teşvikler için Arjan tercih edilebilir."
     )
     
-    # Frontend'in kullanacağı yapılandırılmış JSON formatı
-    return {
-        "answer": final_synthesis,
-        "prediction_data": prediction_results,
-        "context_data": rag_result
+    state["final_response"] = final_synthesis
+    
+    # 5. Tamamlandı
+    final_payload = {
+        "status": "Done",
+        "step": "done",
+        "result": {
+            "answer": state["final_response"],
+            "prediction_data": prediction_results,
+            "context_data": state["rag_context"]
+        }
     }
+    yield f"data: {json.dumps(final_payload)}\n\n"
