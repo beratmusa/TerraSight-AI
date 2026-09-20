@@ -2,8 +2,7 @@ fastapi==0.110.1
 uvicorn==0.29.0
 langgraph
 langchain
-langchain-openai
-openai
+langchain-google-genai
 supabase==2.4.1
 psycopg-binary
 scikit-learn
