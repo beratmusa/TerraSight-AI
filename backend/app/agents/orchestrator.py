@@ -70,7 +70,7 @@ async def run_orchestrator_stream(query: str, budget: float = None, preferences:
         await asyncio.sleep(0.5)
     
     # 4. Sentez (LLM)
-    yield f"data: {json.dumps({'status': 'Orchestrator Agent analyzing data with Gemini...', 'step': 'synthesis'})}\n\n"
+    yield f"data: {json.dumps({'status': 'Orchestrator Agent analyzing data...', 'step': 'synthesis'})}\n\n"
     
     try:
         from langchain_google_genai import ChatGoogleGenerativeAI
