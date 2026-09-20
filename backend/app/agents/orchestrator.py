@@ -70,16 +70,55 @@ async def run_orchestrator_stream(query: str, budget: float = None, preferences:
         await asyncio.sleep(0.5)
     
     # 4. Sentez (LLM)
-    yield f"data: {json.dumps({'status': 'Orchestrator Agent synthesizing final response...', 'step': 'synthesis'})}\n\n"
-    await asyncio.sleep(1)
+    yield f"data: {json.dumps({'status': 'Orchestrator Agent analyzing data with Gemini...', 'step': 'synthesis'})}\n\n"
     
-    final_synthesis = (
-        f"Data synthesis complete. Based on CatBoost ML Modeling:\n"
-        f"- {state['rag_context']['context_summary']}\n"
-        f"- Expected 12-month appreciation for JVC: +{prediction_results[0]['predictions'].get('12_month_appreciation_pct', 0)}%\n"
-        f"- Expected 12-month appreciation for Arjan: +{prediction_results[1]['predictions'].get('12_month_appreciation_pct', 0)}%\n"
-        "These predictions consider GIS proximity to the beach, development stage, ROI, and supply pressure."
-    )
+    try:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        from langchain.schema import HumanMessage, SystemMessage
+        from dotenv import load_dotenv
+        import os
+        
+        load_dotenv()
+        
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-1.5-flash", 
+            temperature=0.2,
+            google_api_key=os.getenv("GEMINI_API_KEY")
+        )
+        
+        system_prompt = (
+            "You are TerraSight AI, an elite real estate investment advisor in Dubai. "
+            "You receive data from specialized agents (RAG, Data Retrieval, and CatBoost ML). "
+            "Your job is to synthesize this data into a professional, concise, and highly analytical recommendation for the user. "
+            "Write in English, use markdown formatting, and be data-driven. Do NOT repeat the raw JSON, explain what it means."
+        )
+        
+        human_prompt = (
+            f"User Query: {query}\n"
+            f"User Budget: {budget} AED\n\n"
+            f"--- RAG Context (Regulations & News) ---\n"
+            f"{json.dumps(state['rag_context'], indent=2)}\n\n"
+            f"--- ML Predictions (12-Month Appreciation) ---\n"
+            f"{json.dumps(prediction_results, indent=2)}\n\n"
+            "Provide a final investment recommendation based on the above data."
+        )
+        
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=human_prompt)
+        ]
+        
+        ai_response = llm.invoke(messages)
+        final_synthesis = ai_response.content
+        
+    except Exception as e:
+        print(f"LLM Error: {e}")
+        final_synthesis = (
+            f"Data synthesis complete (Fallback mode). Based on CatBoost ML Modeling:\n"
+            f"- Expected 12-month appreciation for JVC: +{prediction_results[0]['predictions'].get('12_month_appreciation_pct', 0)}%\n"
+            f"- Expected 12-month appreciation for Arjan: +{prediction_results[1]['predictions'].get('12_month_appreciation_pct', 0)}%\n"
+            f"Error generating AI response: {str(e)}"
+        )
     
     state["final_response"] = final_synthesis
     
