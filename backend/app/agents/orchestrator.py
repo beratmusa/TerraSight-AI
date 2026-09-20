@@ -74,7 +74,7 @@ async def run_orchestrator_stream(query: str, budget: float = None, preferences:
     
     try:
         from langchain_google_genai import ChatGoogleGenerativeAI
-        from langchain.schema import HumanMessage, SystemMessage
+        from langchain_core.messages import HumanMessage, SystemMessage
         from dotenv import load_dotenv
         import os
         
