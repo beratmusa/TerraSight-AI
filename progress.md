@@ -7,7 +7,7 @@ TerraSight AI is a Predictive Real Estate MVP for Dubai, utilizing an agentic AI
 
 - **Frontend:** Next.js 14, Tailwind CSS, shadcn/ui, Mapbox (Heatmaps), Recharts (Graphs).
 - **Backend:** FastAPI, Python 3.13.
-- **LLM Engine:** Google Gemini 1.5 Flash (via `langchain-google-genai`).
+- **LLM Engine:** Google Gemini 2.5 Flash (via `langchain-google-genai`).
 - **ML Engine:** CatBoost (predicting 12-month appreciation %).
 - **Data Engineering:** Automated pipelines (Cron jobs) simulating fetches from Dubai Pulse (Sales) and OpenStreetMap (GIS distances).
 
@@ -22,7 +22,7 @@ TerraSight AI is a Predictive Real Estate MVP for Dubai, utilizing an agentic AI
    - "Warm Start" (Incremental Learning) implemented to train CatBoost on new data without starting from scratch. Model saved as `.cbm`.
 5. **RAG Pipeline (`rag_pipeline.py`):** Boilerplate created for scraping Dubai 2040 Master plan PDFs and News (Zawya/Gulf News) for Supabase `pgvector` embeddings.
 6. **LLM Switch (OpenAI -> Gemini):** Removed OpenAI dependencies. Replaced orchestrator logic with `langchain-google-genai`.
-7. **Gemini Live Integration:** Connected the real `GEMINI_API_KEY`. The Orchestrator now uses `ChatGoogleGenerativeAI(model="gemini-1.5-flash")` to dynamically synthesize the ML predictions and RAG context into a tailored investment thesis!
+7. **Gemini Live Integration:** Connected the real `GEMINI_API_KEY`. The Orchestrator now uses `ChatGoogleGenerativeAI(model="gemini-2.5-flash")` to dynamically synthesize the ML predictions and RAG context into a tailored investment thesis!
 
 ## ⏳ What Is Currently Mocked
 1. **Database / RAG Store:** Supabase (`pgvector` / `TimescaleDB`) is not yet connected. The RAG context returns a hardcoded dictionary.
