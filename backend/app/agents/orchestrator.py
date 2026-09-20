@@ -109,8 +109,14 @@ async def run_orchestrator_stream(query: str, budget: float = None, preferences:
         ]
         
         ai_response = llm.invoke(messages)
-        final_synthesis = ai_response.content
         
+        # Depending on the model and API version, content might be a string or a list of blocks
+        content = ai_response.content
+        if isinstance(content, list):
+            final_synthesis = "".join([block.get("text", "") if isinstance(block, dict) else str(block) for block in content])
+        else:
+            final_synthesis = str(content)
+            
     except Exception as e:
         print(f"LLM Error: {e}")
         final_synthesis = (
