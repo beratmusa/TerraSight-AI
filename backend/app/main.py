@@ -27,20 +27,14 @@ def read_root():
 
 @app.get("/health")
 def check_health():
-    """Modelin yüklü olup olmadığını kontrol eden health check."""
-    model_path = os.path.join("app", "models", "artifacts", "price_prediction_model.joblib")
+    """Health check validating if the CatBoost model is loaded."""
+    model_path = os.path.join("app", "models", "artifacts", "catboost_appreciation_model.cbm")
     is_model_loaded = os.path.exists(model_path)
-    
-    # Gerçekten yükleyip test etmek isterseniz:
-    # try:
-    #     joblib.load(model_path)
-    # except Exception as e:
-    #     return {"status": "error", "message": f"Model load failed: {str(e)}"}
         
     if is_model_loaded:
         return {"status": "ok", "model_loaded": True}
     else:
-        return {"status": "warning", "model_loaded": False, "message": "Model not found."}
+        return {"status": "warning", "model_loaded": False, "message": "CatBoost Model not found."}
 
 @app.post("/agent-query")
 async def process_agent_query(request: QueryRequest):

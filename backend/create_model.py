@@ -1,27 +1,35 @@
 import os
-import joblib
 import pandas as pd
-from sklearn.linear_model import LinearRegression
+from catboost import CatBoostRegressor
 
-# Basit bir mock model oluşturuyoruz
 def train_and_save_mock_model():
-    # Sahte veriler: X (yıl, metro uzaklık), y (fiyat)
-    X = pd.DataFrame({
-        'year': [2021, 2022, 2023, 2021, 2022],
-        'distance_to_metro': [1.5, 1.5, 1.5, 0.5, 0.5]
-    })
-    y = [400000, 420000, 450000, 800000, 850000]
+    csv_path = os.path.join("data", "transactions.csv")
+    df = pd.read_csv(csv_path)
 
-    model = LinearRegression()
+    # Features (X) and Target (y)
+    # Exclude non-numeric or target variables
+    X = df.drop(columns=['district', '12_month_appreciation_pct'])
+    y = df['12_month_appreciation_pct']
+
+    # Initialize CatBoostRegressor
+    model = CatBoostRegressor(
+        iterations=100,
+        learning_rate=0.1,
+        depth=6,
+        verbose=False
+    )
+    
+    # Train model
     model.fit(X, y)
 
-    # Modeli kaydet
+    # Save model
     artifacts_dir = os.path.join("app", "models", "artifacts")
     os.makedirs(artifacts_dir, exist_ok=True)
-    model_path = os.path.join(artifacts_dir, "price_prediction_model.joblib")
     
-    joblib.dump(model, model_path)
-    print(f"Model saved to {model_path}")
+    # Using CatBoost's native save format (often better for deployment)
+    model_path = os.path.join(artifacts_dir, "catboost_appreciation_model.cbm")
+    model.save_model(model_path)
+    print(f"CatBoost model successfully trained and saved to {model_path}")
 
 if __name__ == "__main__":
     train_and_save_mock_model()

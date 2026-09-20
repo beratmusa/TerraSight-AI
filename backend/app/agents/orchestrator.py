@@ -48,28 +48,24 @@ async def run_orchestrator_stream(query: str, budget: float = None, preferences:
     
     # 3. Data Retrieval & ML Prediction
     for loc in locations_to_analyze:
-        yield f"data: {json.dumps({'status': f'Data Retrieval Agent fetching transactions for {loc}...', 'step': 'data'})}\n\n"
-        historical_data = data_retrieval_agent.fetch_historical_prices(loc)
-        geo_data = data_retrieval_agent.fetch_geographic_metrics(loc)
+        yield f"data: {json.dumps({'status': f'Data Retrieval Agent fetching GIS and Financial metrics for {loc}...', 'step': 'data'})}\n\n"
+        data_res = data_retrieval_agent.fetch_all_features(loc)
+        features = data_res.get("features", {})
         
-        state["retrieved_data"][loc] = {
-            "historical": historical_data,
-            "geo": geo_data
-        }
+        state["retrieved_data"][loc] = features
         await asyncio.sleep(0.5)
         
-        yield f"data: {json.dumps({'status': f'ML Agent predicting 5-year ROI for {loc}...', 'step': 'ml'})}\n\n"
+        yield f"data: {json.dumps({'status': f'ML Agent running CatBoost to predict 12-month ROI for {loc}...', 'step': 'ml'})}\n\n"
         ml_prediction = ml_prediction_agent.predict_appreciation(
             location=loc, 
-            historical_data=historical_data
+            features=features
         )
         
         state["ml_prediction"][loc] = ml_prediction
         prediction_results.append({
             "location": loc,
-            "current_metrics": historical_data,
-            "geo_data": geo_data,
-            "predictions": ml_prediction["predictions"]
+            "features": features,
+            "predictions": ml_prediction.get("predictions", {})
         })
         await asyncio.sleep(0.5)
     
@@ -78,11 +74,11 @@ async def run_orchestrator_stream(query: str, budget: float = None, preferences:
     await asyncio.sleep(1)
     
     final_synthesis = (
-        f"Data synthesis complete. Based on your budget of {budget} AED:\n"
+        f"Data synthesis complete. Based on CatBoost ML Modeling:\n"
         f"- {state['rag_context']['context_summary']}\n"
-        f"- Expected 5-year appreciation for JVC: +{prediction_results[0]['predictions']['5_year_appreciation_pct']}%\n"
-        f"- Expected 5-year appreciation for Arjan: +{prediction_results[1]['predictions']['5_year_appreciation_pct']}%\n"
-        "JVC is recommended for long-term holding due to infrastructure plans, while Arjan may benefit from short-term incentives."
+        f"- Expected 12-month appreciation for JVC: +{prediction_results[0]['predictions'].get('12_month_appreciation_pct', 0)}%\n"
+        f"- Expected 12-month appreciation for Arjan: +{prediction_results[1]['predictions'].get('12_month_appreciation_pct', 0)}%\n"
+        "These predictions consider GIS proximity to the beach, development stage, ROI, and supply pressure."
     )
     
     state["final_response"] = final_synthesis
