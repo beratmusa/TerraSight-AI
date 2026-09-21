@@ -55,17 +55,24 @@ async def run_orchestrator_stream(query: str, budget: float = None, preferences:
     
     extraction_prompt = f"""
     You are an NLP extractor for a Dubai real estate platform.
-    Extract the total budget (in AED) and the specific Dubai districts/locations mentioned in the query.
-    If no budget is found, return null. If no locations are found, return ["JVC", "Dubai Marina"] as defaults.
+    Extract the following from the query:
+    1. "budget": total budget in AED (integer, null if not found)
+    2. "locations": array of districts/locations mentioned (e.g. ["Dubai Marina"])
+    3. "property_specs": an object containing specific property details if mentioned:
+       - "sqft": integer (square footage, null if not found)
+       - "has_waterfront_view": 1 for yes/sea view, 0 for no, null if unknown
+       - "floor_level": integer (e.g. 5 for 5th floor, null if unknown)
+       - "project_stage": 0 for ready/completed, 1 for off-plan/under construction, null if unknown
+    
+    If no locations are found, return ["JVC", "Dubai Marina"].
     Return ONLY a valid JSON object. No markdown blocks, no extra text.
-    Format: {{"budget": 500000, "locations": ["JVC", "Arjan"]}}
+    Format: {{"budget": 500000, "locations": ["Marina"], "property_specs": {{"sqft": 1200, "has_waterfront_view": 1, "floor_level": null, "project_stage": 0}}}}
     
     Query: {query}
     """
     
     try:
         ext_res = llm.invoke([HumanMessage(content=extraction_prompt)])
-        # Clean potential markdown from response
         clean_json = re.sub(r'```(?:json)?\n?(.*?)\n?```', r'\1', ext_res.content, flags=re.DOTALL).strip()
         parsed_intent = json.loads(clean_json)
         
@@ -77,11 +84,14 @@ async def run_orchestrator_stream(query: str, budget: float = None, preferences:
         if not locations_to_analyze:
             locations_to_analyze = ["JVC", "Dubai Marina"]
             
+        property_specs = parsed_intent.get("property_specs", {})
+            
     except Exception as e:
         print(f"Extraction error: {e}")
         locations_to_analyze = ["JVC", "Arjan"]
+        property_specs = {}
         
-    yield f"data: {json.dumps({'status': f'Extracted Budget: {state.get("budget", "Not specified")} AED | Locations: {", ".join(locations_to_analyze)}', 'step': 'nlp_done'})}\n\n"
+    yield f"data: {json.dumps({'status': f'Extracted Specs: Locs={locations_to_analyze}, sqft={property_specs.get("sqft", "N/A")}', 'step': 'nlp_done'})}\n\n"
     await asyncio.sleep(1)
     
     # 3. RAG Bağlamı (Context)
@@ -94,7 +104,7 @@ async def run_orchestrator_stream(query: str, budget: float = None, preferences:
     # 4. Data Retrieval & ML Prediction
     for loc in locations_to_analyze:
         yield f"data: {json.dumps({'status': f'Data Retrieval Agent fetching GIS and Financial metrics for {loc}...', 'step': 'data'})}\n\n"
-        data_res = data_retrieval_agent.fetch_all_features(loc)
+        data_res = data_retrieval_agent.fetch_all_features(loc, property_specs)
         features = data_res.get("features", {})
         
         state["retrieved_data"][loc] = features

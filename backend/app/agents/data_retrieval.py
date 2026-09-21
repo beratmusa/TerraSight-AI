@@ -10,10 +10,12 @@ class DataRetrievalAgent:
     def __init__(self):
         self.csv_path = os.path.join(os.getcwd(), "data", "transactions.csv")
         
-    def fetch_all_features(self, location: str) -> Dict[str, Any]:
-        """Fetches all features from CSV for a specific location."""
+    def fetch_all_features(self, location: str, user_specs: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Fetches all features from CSV for a specific location and merges user specs."""
         print(f"DataRetrievalAgent: Fetching GIS and financial data for '{location}'...")
-        
+        if user_specs is None:
+            user_specs = {}
+            
         try:
             df = pd.read_csv(self.csv_path)
             
@@ -32,6 +34,11 @@ class DataRetrievalAgent:
             avg_all = loc_df.drop(columns=['district', '12_month_appreciation_pct']).mean().to_dict()
             lat = avg_all.pop("lat", 25.06)
             lng = avg_all.pop("lng", 55.20)
+            
+            # OVERWRITE average features with user-specific specs if provided
+            for key, val in user_specs.items():
+                if val is not None and key in avg_all:
+                    avg_all[key] = val
             
             return {
                 "location": location,
