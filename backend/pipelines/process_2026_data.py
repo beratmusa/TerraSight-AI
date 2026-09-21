@@ -51,18 +51,21 @@ def clean_and_preprocess_2026_data():
         elif dist == 'AL THANYAH FIFTH': coord_dict[dist] = (25.075, 55.155)
         else:
             try:
-                # Search Dubai + District Name
                 loc = geolocator.geocode(f"{dist}, Dubai", timeout=5)
                 if loc:
                     coord_dict[dist] = (loc.latitude, loc.longitude)
                 else:
-                    coord_dict[dist] = (25.06, 55.20) # Fallback to center
-                time.sleep(0.5) # Respect Nominatim rate limit
+                    coord_dict[dist] = (np.nan, np.nan)
+                time.sleep(0.5) 
             except:
-                coord_dict[dist] = (25.06, 55.20)
+                coord_dict[dist] = (np.nan, np.nan)
                 
-    clean_df['lat'] = clean_df['district'].map(lambda x: coord_dict.get(x, (25.06, 55.20))[0])
-    clean_df['lng'] = clean_df['district'].map(lambda x: coord_dict.get(x, (25.06, 55.20))[1])
+    clean_df['lat'] = clean_df['district'].map(lambda x: coord_dict.get(x, (np.nan, np.nan))[0])
+    clean_df['lng'] = clean_df['district'].map(lambda x: coord_dict.get(x, (np.nan, np.nan))[1])
+    
+    # Drop rows where geocoding failed to prevent spatial noise
+    clean_df = clean_df.dropna(subset=['lat', 'lng'])
+    print(f"[Preprocess] Dropped districts with unknown coordinates. Remaining clean rows: {len(clean_df)}")
     
     print("[Preprocess] Calculating actual geospatial distances...")
     beach_coords = (25.0786, 55.1328)
