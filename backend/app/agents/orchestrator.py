@@ -142,7 +142,7 @@ async def run_orchestrator_stream(query: str, budget: float = None, preferences:
         
         human_prompt = (
             f"User Query: {query}\n"
-            f"User Budget: {budget} AED\n\n"
+            f"User Budget: {state.get('budget', 'Not specified')} AED\n\n"
             f"--- RAG Context (Regulations & News) ---\n"
             f"{json.dumps(state['rag_context'], indent=2)}\n\n"
             f"--- ML Predictions (12-Month Appreciation) ---\n"

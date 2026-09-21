@@ -16,9 +16,15 @@ class DataRetrievalAgent:
         
         try:
             df = pd.read_csv(self.csv_path)
-            loc_df = df[df['district'] == location]
+            
+            # Fuzzy match: case insensitive and substring
+            # e.g. "Dubai Marina" matches "Marina" in CSV, "Downtown Dubai" matches "Downtown"
+            search_loc = location.lower()
+            mask = df['district'].str.lower().apply(lambda x: x in search_loc or search_loc in x)
+            loc_df = df[mask]
             
             if loc_df.empty:
+                print(f"DataRetrievalAgent: WARNING - No data found for '{location}'.")
                 return {"location": location, "error": "No data found"}
                 
             # For simplicity, taking the mean of all transactions in that district 

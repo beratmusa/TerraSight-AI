@@ -22,14 +22,14 @@ class RAGContextAgent:
             "retrieved_documents": [
                 {
                     "source": "Dubai 2040 Urban Master Plan",
-                    "content": "JVC is planned to see increased green spaces and a new community mall by 2025."
+                    "content": "The master plan prioritizes infrastructure development, new metro lines, and green spaces across major residential corridors."
                 },
                 {
-                    "source": "Real Estate Regulations 2023",
-                    "content": "New tax incentives for buyers in emerging districts like Arjan."
+                    "source": "Real Estate Regulations 2024",
+                    "content": "Foreign investment continues to be highly incentivized across freehold areas with stable visa regulations."
                 }
             ],
-            "context_summary": "Infrastructure development is planned for JVC, while Arjan stands out with new tax incentives."
+            "context_summary": "Dubai 2040 Master Plan focuses on transit-oriented development and expanding green infrastructure, creating long-term capital appreciation across key freehold zones."
         }
 
 rag_context_agent = RAGContextAgent()
