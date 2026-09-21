@@ -13,15 +13,7 @@ const INITIAL_VIEW_STATE = {
   bearing: -17.6,
 };
 
-// Coordinate mapping for Dubai districts
-const DISTRICT_COORDINATES: Record<string, [number, number]> = {
-  "JVC": [55.205, 25.065],
-  "Arjan": [55.242, 25.055],
-  "Dubai Marina": [55.14, 25.08],
-  "Downtown Dubai": [55.27, 25.20],
-  "Motor City": [55.235, 25.045],
-};
-
+// No hardcoded coordinates needed! Backend sends lat/lng dynamically
 const heatmapLayer: HeatmapLayer = {
   id: "appreciation-heatmap-layer",
   type: "heatmap",
@@ -50,7 +42,7 @@ export default function MapView({ data }: { data?: any[] }) {
     // If no dynamic data, show empty or default state
     const features = data && data.length > 0 
       ? data.map(item => {
-          const coords = DISTRICT_COORDINATES[item.location] || [55.2308, 25.0648];
+          const coords = [item.lng || 55.2308, item.lat || 25.0648];
           // Normalize appreciation (e.g. 15% -> 0.8 weight)
           const weight = Math.min(Math.max((item.predictions?.["12_month_appreciation_pct"] || 0) / 20, 0.1), 1.0);
           return {

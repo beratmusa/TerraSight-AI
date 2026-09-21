@@ -23,11 +23,15 @@ class DataRetrievalAgent:
                 
             # For simplicity, taking the mean of all transactions in that district 
             # to feed into the model as the 'average' property representation
-            avg_features = loc_df.drop(columns=['district', '12_month_appreciation_pct']).mean().to_dict()
+            avg_all = loc_df.drop(columns=['district', '12_month_appreciation_pct']).mean().to_dict()
+            lat = avg_all.pop("lat", 25.06)
+            lng = avg_all.pop("lng", 55.20)
             
             return {
                 "location": location,
-                "features": avg_features
+                "lat": lat,
+                "lng": lng,
+                "features": avg_all
             }
         except Exception as e:
             return {"location": location, "error": str(e)}

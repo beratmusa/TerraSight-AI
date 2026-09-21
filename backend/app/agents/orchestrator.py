@@ -37,16 +37,61 @@ async def run_orchestrator_stream(query: str, budget: float = None, preferences:
     yield f"data: {json.dumps({'status': 'Analyzing query...', 'step': 'init'})}\n\n"
     await asyncio.sleep(1) # Simülasyon için bekleme
     
-    # 2. RAG Bağlamı (Context)
+    # 2. Intent Extraction (LLM)
+    yield f"data: {json.dumps({'status': 'NLP Agent extracting budget and locations...', 'step': 'nlp'})}\n\n"
+    
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    from langchain_core.messages import HumanMessage
+    from dotenv import load_dotenv
+    import os
+    import re
+    
+    load_dotenv()
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-3.6-flash", 
+        temperature=0,
+        google_api_key=os.getenv("GEMINI_API_KEY")
+    )
+    
+    extraction_prompt = f"""
+    You are an NLP extractor for a Dubai real estate platform.
+    Extract the total budget (in AED) and the specific Dubai districts/locations mentioned in the query.
+    If no budget is found, return null. If no locations are found, return ["JVC", "Dubai Marina"] as defaults.
+    Return ONLY a valid JSON object. No markdown blocks, no extra text.
+    Format: {{"budget": 500000, "locations": ["JVC", "Arjan"]}}
+    
+    Query: {query}
+    """
+    
+    try:
+        ext_res = llm.invoke([HumanMessage(content=extraction_prompt)])
+        # Clean potential markdown from response
+        clean_json = re.sub(r'```(?:json)?\n?(.*?)\n?```', r'\1', ext_res.content, flags=re.DOTALL).strip()
+        parsed_intent = json.loads(clean_json)
+        
+        extracted_budget = parsed_intent.get("budget")
+        if extracted_budget:
+            state["budget"] = float(extracted_budget)
+            
+        locations_to_analyze = parsed_intent.get("locations", ["JVC", "Dubai Marina"])
+        if not locations_to_analyze:
+            locations_to_analyze = ["JVC", "Dubai Marina"]
+            
+    except Exception as e:
+        print(f"Extraction error: {e}")
+        locations_to_analyze = ["JVC", "Arjan"]
+        
+    yield f"data: {json.dumps({'status': f'Extracted Budget: {state.get("budget", "Not specified")} AED | Locations: {", ".join(locations_to_analyze)}', 'step': 'nlp_done'})}\n\n"
+    await asyncio.sleep(1)
+    
+    # 3. RAG Bağlamı (Context)
     yield f"data: {json.dumps({'status': 'RAG Agent searching regulations...', 'step': 'rag'})}\n\n"
     state["rag_context"] = rag_context_agent.retrieve_context(state["query"])
     await asyncio.sleep(1)
     
-    # NLP ile lokasyonların çıkarıldığını varsayıyoruz
-    locations_to_analyze = ["JVC", "Arjan"]
     prediction_results = []
     
-    # 3. Data Retrieval & ML Prediction
+    # 4. Data Retrieval & ML Prediction
     for loc in locations_to_analyze:
         yield f"data: {json.dumps({'status': f'Data Retrieval Agent fetching GIS and Financial metrics for {loc}...', 'step': 'data'})}\n\n"
         data_res = data_retrieval_agent.fetch_all_features(loc)
@@ -64,6 +109,8 @@ async def run_orchestrator_stream(query: str, budget: float = None, preferences:
         state["ml_prediction"][loc] = ml_prediction
         prediction_results.append({
             "location": loc,
+            "lat": data_res.get("lat", 25.06),
+            "lng": data_res.get("lng", 55.20),
             "features": features,
             "predictions": ml_prediction.get("predictions", {})
         })
@@ -135,7 +182,8 @@ async def run_orchestrator_stream(query: str, budget: float = None, preferences:
         "result": {
             "answer": state["final_response"],
             "prediction_data": prediction_results,
-            "context_data": state["rag_context"]
+            "context_data": state["rag_context"],
+            "budget": state.get("budget", 500000)
         }
     }
     yield f"data: {json.dumps(final_payload)}\n\n"

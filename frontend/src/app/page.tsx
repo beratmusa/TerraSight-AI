@@ -15,6 +15,7 @@ export default function Home() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [currentStep, setCurrentStep] = useState<string>("");
   const [predictionData, setPredictionData] = useState<any[]>([]);
+  const [budget, setBudget] = useState<number>(500000);
 
   const handleQuery = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +31,7 @@ export default function Home() {
       const response = await fetch("http://localhost:8000/agent-query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: userMessage, budget: 500000 })
+        body: JSON.stringify({ query: userMessage, budget: null })
       });
 
       if (!response.body) throw new Error("No response body");
@@ -56,6 +57,9 @@ export default function Home() {
                   finalAnswer = data.result.answer;
                   if (data.result.prediction_data) {
                     setPredictionData(data.result.prediction_data);
+                  }
+                  if (data.result.budget) {
+                    setBudget(data.result.budget);
                   }
                   setCurrentStep("");
                 } else {
@@ -118,7 +122,7 @@ export default function Home() {
             
             <div className="space-y-4 pt-10">
               <h2 className="text-xl font-semibold">Growth Trends</h2>
-              <PredictionChart data={predictionData} />
+              <PredictionChart data={predictionData} budget={budget} />
             </div>
           </div>
 

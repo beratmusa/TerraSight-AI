@@ -14,23 +14,22 @@ import {
 
 const COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"];
 
-export default function PredictionChart({ data }: { data?: any[] }) {
+export default function PredictionChart({ data, budget = 500000 }: { data?: any[], budget?: number }) {
   
   const chartData = useMemo(() => {
     // If no data, return default mock
     if (!data || data.length === 0) {
       return [
-        { year: "2024", JVC: 450000, Arjan: 480000 },
-        { year: "2025", JVC: 480000, Arjan: 500000 },
-        { year: "2026", JVC: 520000, Arjan: 535000 },
-        { year: "2027", JVC: 575000, Arjan: 580000 },
-        { year: "2028", JVC: 640000, Arjan: 630000 },
+        { year: "2024", JVC: budget, Arjan: budget * 1.05 },
+        { year: "2025", JVC: budget * 1.06, Arjan: budget * 1.1 },
+        { year: "2026", JVC: budget * 1.15, Arjan: budget * 1.2 },
+        { year: "2027", JVC: budget * 1.25, Arjan: budget * 1.35 },
+        { year: "2028", JVC: budget * 1.4, Arjan: budget * 1.55 },
       ];
     }
 
     // Generate 5-year compound growth using the ML prediction percentage
     const currentYear = new Date().getFullYear();
-    const baseValue = 500000; // Starting budget/value
 
     return Array.from({ length: 5 }).map((_, i) => {
       const yearStr = (currentYear + i).toString();
@@ -39,7 +38,7 @@ export default function PredictionChart({ data }: { data?: any[] }) {
       data.forEach(item => {
         const pct = (item.predictions?.["12_month_appreciation_pct"] || 5) / 100;
         // Compound interest formula: A = P(1 + r)^t
-        yearObj[item.location] = Math.round(baseValue * Math.pow(1 + pct, i));
+        yearObj[item.location] = Math.round(budget * Math.pow(1 + pct, i));
       });
       
       return yearObj;
