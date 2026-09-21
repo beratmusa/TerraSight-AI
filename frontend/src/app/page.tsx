@@ -16,6 +16,7 @@ export default function Home() {
   const [currentStep, setCurrentStep] = useState<string>("");
   const [predictionData, setPredictionData] = useState<any[]>([]);
   const [budget, setBudget] = useState<number>(500000);
+  const [mapMode, setMapMode] = useState<"appreciation" | "buy" | "sell">("appreciation");
 
   const handleQuery = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,6 +61,9 @@ export default function Home() {
                   }
                   if (data.result.budget) {
                     setBudget(data.result.budget);
+                  }
+                  if (data.result.map_mode) {
+                    setMapMode(data.result.map_mode);
                   }
                   setCurrentStep("");
                 } else {
@@ -116,8 +120,8 @@ export default function Home() {
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 flex flex-col gap-8">
             <div className="space-y-4 h-[400px]">
-              <h2 className="text-xl font-semibold">AI Prediction Heatmap</h2>
-              <MapView data={predictionData} />
+              <h2 className="text-xl font-semibold">AI Spatial Analytics</h2>
+              <MapView data={predictionData} mode={mapMode} onModeChange={setMapMode} />
             </div>
             
             <div className="space-y-4 pt-10">

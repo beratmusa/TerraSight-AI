@@ -40,10 +40,16 @@ class DataRetrievalAgent:
                 if val is not None and key in avg_all:
                     avg_all[key] = val
             
+            # Mock Buy/Sell volumes based on available metrics
+            weekly_buy_volume = int(avg_all.get('momentum_3m', 1) * 120 + 50)
+            weekly_sell_volume = int(avg_all.get('days_on_market', 30) * 8)
+            
             return {
                 "location": location,
                 "lat": lat,
                 "lng": lng,
+                "weekly_buy_volume": weekly_buy_volume,
+                "weekly_sell_volume": weekly_sell_volume,
                 "features": avg_all
             }
         except Exception as e:

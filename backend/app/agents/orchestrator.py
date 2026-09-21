@@ -58,15 +58,12 @@ async def run_orchestrator_stream(query: str, budget: float = None, preferences:
     Extract the following from the query:
     1. "budget": total budget in AED (integer, null if not found)
     2. "locations": array of districts/locations mentioned (e.g. ["Dubai Marina"])
-    3. "property_specs": an object containing specific property details if mentioned:
-       - "sqft": integer (square footage, null if not found)
-       - "has_waterfront_view": 1 for yes/sea view, 0 for no, null if unknown
-       - "floor_level": integer (e.g. 5 for 5th floor, null if unknown)
-       - "project_stage": 0 for ready/completed, 1 for off-plan/under construction, null if unknown
+    3. "property_specs": an object containing specific property details if mentioned
+    4. "map_mode": string. If user asks about buying/demand, set to "buy". If user asks about selling/supply/leaving, set to "sell". Default to "appreciation".
     
     If no locations are found, return ["JVC", "Dubai Marina"].
     Return ONLY a valid JSON object. No markdown blocks, no extra text.
-    Format: {{"budget": 500000, "locations": ["Marina"], "property_specs": {{"sqft": 1200, "has_waterfront_view": 1, "floor_level": null, "project_stage": 0}}}}
+    Format: {{"budget": 500000, "locations": ["Marina"], "map_mode": "appreciation", "property_specs": {{}}}}
     
     Query: {query}
     """
@@ -85,13 +82,15 @@ async def run_orchestrator_stream(query: str, budget: float = None, preferences:
             locations_to_analyze = ["JVC", "Dubai Marina"]
             
         property_specs = parsed_intent.get("property_specs", {})
+        map_mode = parsed_intent.get("map_mode", "appreciation")
             
     except Exception as e:
         print(f"Extraction error: {e}")
         locations_to_analyze = ["JVC", "Arjan"]
         property_specs = {}
+        map_mode = "appreciation"
         
-    yield f"data: {json.dumps({'status': f'Extracted Specs: Locs={locations_to_analyze}, sqft={property_specs.get("sqft", "N/A")}', 'step': 'nlp_done'})}\n\n"
+    yield f"data: {json.dumps({'status': f'Extracted: Locs={locations_to_analyze}, Mode={map_mode}', 'step': 'nlp_done'})}\n\n"
     await asyncio.sleep(1)
     
     # 3. RAG Bağlamı (Context)
@@ -121,6 +120,8 @@ async def run_orchestrator_stream(query: str, budget: float = None, preferences:
             "location": loc,
             "lat": data_res.get("lat", 25.06),
             "lng": data_res.get("lng", 55.20),
+            "weekly_buy_volume": data_res.get("weekly_buy_volume", 100),
+            "weekly_sell_volume": data_res.get("weekly_sell_volume", 100),
             "features": features,
             "predictions": ml_prediction.get("predictions", {})
         })
@@ -193,7 +194,8 @@ async def run_orchestrator_stream(query: str, budget: float = None, preferences:
             "answer": state["final_response"],
             "prediction_data": prediction_results,
             "context_data": state["rag_context"],
-            "budget": state.get("budget", 500000)
+            "budget": state.get("budget", 500000),
+            "map_mode": map_mode
         }
     }
     yield f"data: {json.dumps(final_payload)}\n\n"
