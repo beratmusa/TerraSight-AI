@@ -35,6 +35,42 @@ def fetch_dubai_pulse_data():
     })
     return new_data
 
+def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Cleans the raw data to prevent noise from poisoning the ML model.
+    """
+    print("[Pipeline] Preprocessing data (Noise reduction & Imputation)...")
+    df_clean = df.copy()
+    
+    # 1. Missing Value Imputation
+    # If service charge is missing, fill with median of the dataset (or ideally median of the district)
+    if 'service_charge_aed' in df_clean.columns:
+        df_clean['service_charge_aed'] = df_clean['service_charge_aed'].fillna(df_clean['service_charge_aed'].median())
+        
+    # Fill missing binary features with 0
+    if 'has_waterfront_view' in df_clean.columns:
+        df_clean['has_waterfront_view'] = df_clean['has_waterfront_view'].fillna(0)
+        
+    # 2. Outlier Removal using IQR (Interquartile Range)
+    # Extremely high sqft or prices in real estate are often data entry errors or ultra-luxury outliers
+    # that skew the model for standard properties.
+    if 'sqft' in df_clean.columns:
+        Q1 = df_clean['sqft'].quantile(0.25)
+        Q3 = df_clean['sqft'].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        # Filter out extreme outliers
+        df_clean = df_clean[(df_clean['sqft'] >= lower_bound) & (df_clean['sqft'] <= upper_bound)]
+        
+    # 3. Target Variable Sanity Check
+    # Remove any rows where appreciation is logically impossible (e.g., +300% in a year due to typos)
+    if '12_month_appreciation_pct' in df_clean.columns:
+        df_clean = df_clean[(df_clean['12_month_appreciation_pct'] > -50) & (df_clean['12_month_appreciation_pct'] < 100)]
+        
+    print(f"[Pipeline] Preprocessing complete. Rows retained: {len(df_clean)} / {len(df)}")
+    return df_clean
+
 def run_ml_training_pipeline():
     """
     MLOps Pipeline: Model Evaluation, Backup & Conditional Deploy
@@ -42,9 +78,13 @@ def run_ml_training_pipeline():
     print("=== Starting MLOps Pipeline ===")
     
     # 1. Get new data and split for validation
-    new_data = fetch_dubai_pulse_data()
-    X = new_data.drop(columns=['12_month_appreciation_pct'])
-    y = new_data['12_month_appreciation_pct']
+    raw_data = fetch_dubai_pulse_data()
+    
+    # Apply Preprocessing (Noise Reduction)
+    clean_data = preprocess_data(raw_data)
+    
+    X = clean_data.drop(columns=['12_month_appreciation_pct'])
+    y = clean_data['12_month_appreciation_pct']
     
     # We keep a validation set to test the new model vs old model
     X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
