@@ -1,6 +1,10 @@
 import os
+import shutil
 import pandas as pd
+import numpy as np
 from catboost import CatBoostRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.model_selection import train_test_split
 
 def fetch_dubai_pulse_data():
     """
@@ -12,62 +16,84 @@ def fetch_dubai_pulse_data():
     
     # Mocking newly arrived data for this month
     new_data = pd.DataFrame({
-        'distance_to_beach_km': [12.0, 1.2, 14.5],
-        'drive_time_burj_khalifa_min': [24, 21, 26],
-        'amenity_density_1km': [9, 21, 6],
-        'momentum_3m': [1.3, 0.6, 2.2],
-        'momentum_6m': [3.6, 1.6, 5.8],
-        'momentum_12m': [8.1, 4.1, 12.2],
-        'roi_pct': [6.6, 5.9, 7.2],
-        'supply_pressure_2y': [1400, 320, 1950],
-        'days_on_market': [43, 26, 48],
-        'developer_tier': [2, 1, 3],
-        'project_stage': [0, 1, 0],
-        'sqft': [860, 1150, 780],
-        'floor_level': [6, 42, 4],
-        'service_charge_aed': [13, 23, 11],
-        'has_waterfront_view': [0, 1, 0],
-        '12_month_appreciation_pct': [12.8, 4.5, 15.6] # Target
+        'distance_to_beach_km': [12.0, 1.2, 14.5, 10.0, 5.0],
+        'drive_time_burj_khalifa_min': [24, 21, 26, 15, 10],
+        'amenity_density_1km': [9, 21, 6, 12, 18],
+        'momentum_3m': [1.3, 0.6, 2.2, 1.0, 0.9],
+        'momentum_6m': [3.6, 1.6, 5.8, 2.5, 2.0],
+        'momentum_12m': [8.1, 4.1, 12.2, 6.0, 5.0],
+        'roi_pct': [6.6, 5.9, 7.2, 6.0, 5.5],
+        'supply_pressure_2y': [1400, 320, 1950, 800, 500],
+        'days_on_market': [43, 26, 48, 35, 30],
+        'developer_tier': [2, 1, 3, 1, 1],
+        'project_stage': [0, 1, 0, 0, 0],
+        'sqft': [860, 1150, 780, 1200, 900],
+        'floor_level': [6, 42, 4, 15, 10],
+        'service_charge_aed': [13, 23, 11, 16, 15],
+        'has_waterfront_view': [0, 1, 0, 0, 1],
+        '12_month_appreciation_pct': [12.8, 4.5, 15.6, 8.0, 6.5] # Target
     })
     return new_data
 
 def run_ml_training_pipeline():
     """
-    MLOps Pipeline: Concept Drift & Incremental Learning (Warm Start)
-    Runs weekly/monthly via Cron or GitHub Actions.
+    MLOps Pipeline: Model Evaluation, Backup & Conditional Deploy
     """
     print("=== Starting MLOps Pipeline ===")
     
-    # 1. Get new data
+    # 1. Get new data and split for validation
     new_data = fetch_dubai_pulse_data()
-    X_new = new_data.drop(columns=['12_month_appreciation_pct'])
-    y_new = new_data['12_month_appreciation_pct']
+    X = new_data.drop(columns=['12_month_appreciation_pct'])
+    y = new_data['12_month_appreciation_pct']
     
-    # 2. Load existing model (for Warm Start)
+    # We keep a validation set to test the new model vs old model
+    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
+    
     artifacts_dir = os.path.join(os.getcwd(), "app", "models", "artifacts")
+    os.makedirs(artifacts_dir, exist_ok=True)
     model_path = os.path.join(artifacts_dir, "catboost_appreciation_model.cbm")
+    backup_path = os.path.join(artifacts_dir, "catboost_appreciation_model.cbm.bak")
     
-    model = CatBoostRegressor()
+    old_model = CatBoostRegressor()
+    new_model = CatBoostRegressor(iterations=50, learning_rate=0.05, depth=6, verbose=False)
+    
+    old_rmse = float('inf')
     
     if os.path.exists(model_path):
-        print(f"[Pipeline] Existing model found at {model_path}. Loading for incremental training...")
-        model.load_model(model_path)
+        print(f"[Pipeline] Existing model found. Evaluating current performance...")
+        old_model.load_model(model_path)
         
-        # 3. Incremental Training (Warm Start)
-        # Using init_model to continue training from existing weights
-        print("[Pipeline] Performing warm-start training with new data...")
-        model = CatBoostRegressor(iterations=50, learning_rate=0.05, depth=6, verbose=False)
-        model.fit(X_new, y_new, init_model=model_path)
+        # Evaluate OLD model on the new validation data
+        old_preds = old_model.predict(X_val)
+        old_rmse = np.sqrt(mean_squared_error(y_val, old_preds))
+        print(f"[Pipeline] Old Model RMSE: {old_rmse:.4f}")
+        
+        # 2. Train NEW model using Warm Start
+        print("[Pipeline] Training NEW model (Warm Start)...")
+        new_model.fit(X_train, y_train, init_model=model_path, eval_set=(X_val, y_val))
     else:
         print("[Pipeline] No existing model found. Training from scratch...")
-        model.fit(X_new, y_new)
+        new_model.fit(X_train, y_train, eval_set=(X_val, y_val))
         
-    # 4. Shadow Testing logic would go here (evaluate RMSE against validation set)
-    # if new_model_error < old_model_error:
+    # 3. Evaluate NEW model
+    new_preds = new_model.predict(X_val)
+    new_rmse = np.sqrt(mean_squared_error(y_val, new_preds))
+    print(f"[Pipeline] New Model RMSE: {new_rmse:.4f}")
     
-    # 5. Deploy / Save
-    model.save_model(model_path)
-    print(f"[Pipeline] Updated model deployed to {model_path}")
+    # 4. Conditional Deploy (Champion vs Challenger)
+    if new_rmse < old_rmse or not os.path.exists(model_path):
+        print("[Pipeline] SUCCESS: New model outperformed old model (or is first model). Deploying...")
+        
+        # Create Backup of the old model just in case
+        if os.path.exists(model_path):
+            shutil.copy2(model_path, backup_path)
+            print(f"[Pipeline] Backup created at {backup_path}")
+            
+        new_model.save_model(model_path)
+        print(f"[Pipeline] Champion model saved to {model_path}")
+    else:
+        print("[Pipeline] WARNING: New model performed worse. Rejecting update. Old model kept.")
+        
     print("=== MLOps Pipeline Complete ===")
 
 if __name__ == "__main__":
