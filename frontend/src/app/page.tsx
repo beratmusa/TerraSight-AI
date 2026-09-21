@@ -14,6 +14,7 @@ export default function Home() {
   ]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [currentStep, setCurrentStep] = useState<string>("");
+  const [predictionData, setPredictionData] = useState<any[]>([]);
 
   const handleQuery = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,6 +54,9 @@ export default function Home() {
                 const data = JSON.parse(line.replace('data: ', ''));
                 if (data.status === "Done") {
                   finalAnswer = data.result.answer;
+                  if (data.result.prediction_data) {
+                    setPredictionData(data.result.prediction_data);
+                  }
                   setCurrentStep("");
                 } else {
                   setCurrentStep(data.status);
@@ -109,12 +113,12 @@ export default function Home() {
           <div className="lg:col-span-2 flex flex-col gap-8">
             <div className="space-y-4 h-[400px]">
               <h2 className="text-xl font-semibold">AI Prediction Heatmap</h2>
-              <MapView />
+              <MapView data={predictionData} />
             </div>
             
             <div className="space-y-4 pt-10">
               <h2 className="text-xl font-semibold">Growth Trends</h2>
-              <PredictionChart />
+              <PredictionChart data={predictionData} />
             </div>
           </div>
 
