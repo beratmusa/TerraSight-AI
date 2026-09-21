@@ -157,6 +157,9 @@ class DataIngestionEngine:
             
         return df
 
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
 from app.db.supabase_client import get_supabase_client
 
 if __name__ == "__main__":
