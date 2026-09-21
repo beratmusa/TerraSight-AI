@@ -23,13 +23,12 @@ TerraSight AI is a Predictive Real Estate MVP for Dubai, utilizing an agentic AI
 5. **RAG Pipeline (`rag_pipeline.py`):** Boilerplate created for scraping Dubai 2040 Master plan PDFs and News (Zawya/Gulf News) for Supabase `pgvector` embeddings.
 6. **LLM Switch (OpenAI -> Gemini):** Removed OpenAI dependencies. Replaced orchestrator logic with `langchain-google-genai`.
 7. **Gemini Live Integration:** Connected the real `GEMINI_API_KEY`. The Orchestrator now uses `ChatGoogleGenerativeAI(model="gemini-2.5-flash")` to dynamically synthesize the ML predictions and RAG context into a tailored investment thesis!
+8. **Dynamic Frontend Data:** Connected Mapbox Heatmap and Recharts graph to the live ML prediction payload returned by the Orchestrator. The UI now dynamically re-renders based on CatBoost output.
 
 ## ⏳ What Is Currently Mocked
 1. **Database / RAG Store:** Supabase (`pgvector` / `TimescaleDB`) is not yet connected. The RAG context returns a hardcoded dictionary.
 2. **Data Fetching:** Dubai Pulse and OSM data fetches are simulated via local `transactions.csv` and Python arrays.
-3. **Frontend Visuals:** Mapbox heatmap points and Rechart graph data are still static arrays in the frontend components, rather than fetching the live ML predictions.
 
 ## 🎯 Next Steps
 - [ ] Connect Supabase PostgreSQL and set up the `pgvector` table for RAG.
-- [ ] Make the Frontend Mapbox and Recharts components fetch data dynamically from the Backend instead of using static mock data.
 - [ ] Implement actual Web Scraping (BeautifulSoup/Selenium) and OSM distance calculations in the data pipelines.
