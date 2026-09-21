@@ -23,57 +23,68 @@ class DataIngestionEngine:
         self.beach_coords = (25.0786, 55.1328) # JBR Beach
         self.burj_khalifa_coords = (25.1972, 55.2744)
 
-    def fetch_dld_transactions(self, limit=100) -> pd.DataFrame:
+    def fetch_dld_transactions(self, total_limit=500, chunk_size=100) -> pd.DataFrame:
         """
-        Fetches the latest real estate transactions LIVE from Dubai Pulse Open Data API.
-        Uses the CKAN datastore_search endpoint.
+        Fetches real estate transactions LIVE from Dubai Pulse Open Data API.
+        Uses pagination (offset/limit) and rate-limiting delays to prevent IP bans.
         """
-        print("[Ingestion] Connecting to LIVE Dubai Pulse Open Data API...")
+        import time
+        print("[Ingestion] Connecting to LIVE Dubai Pulse Open Data API with Pagination...")
         
-        # Dubai Pulse CKAN API endpoint for Real Estate Transactions
-        # Resource ID for transactions (this ID changes periodically on Dubai Pulse)
-        # We use a known historical/active resource ID for demonstration.
         resource_id = "4159fc5b-9dcd-4560-bf86-531e21b8c1ec" 
-        api_url = f"https://www.dubaipulse.gov.ae/data/api/3/action/datastore_search?resource_id={resource_id}&limit={limit}"
+        all_records = []
+        offset = 0
         
         try:
-            response = requests.get(api_url, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                records = data.get("result", {}).get("records", [])
-                if records:
-                    df = pd.DataFrame(records)
-                    print(f"[Ingestion] Successfully downloaded {len(df)} live transactions from DLD.")
+            while offset < total_limit:
+                api_url = f"https://www.dubaipulse.gov.ae/data/api/3/action/datastore_search?resource_id={resource_id}&limit={chunk_size}&offset={offset}"
+                
+                response = requests.get(api_url, timeout=15)
+                if response.status_code == 200:
+                    data = response.json()
+                    records = data.get("result", {}).get("records", [])
                     
-                    # Transform real DLD columns to our model's schema
-                    # Example of DLD real columns: 'area_name_en', 'trans_value', 'property_size_sq_m'
-                    # Since DLD schemas change, we'll map what we can and mock the rest for the MVP CatBoost model
+                    if not records:
+                        break # No more data available
+                        
+                    all_records.extend(records)
+                    print(f"[Ingestion] Fetched {len(records)} records (Offset: {offset})...")
                     
-                    mapped_df = pd.DataFrame({
-                        'district': df.get('area_name_en', df.get('area', 'JVC')).fillna('JVC'),
-                        'sqft': df.get('property_size_sq_m', 80).astype(float) * 10.764, # Convert sqm to sqft
-                        '12_month_appreciation_pct': [10.5] * len(df), # In real pipeline, calculated historically
-                        # Map other required columns with default fallbacks for now
-                        'lat': 25.06,
-                        'lng': 55.20,
-                        'distance_to_beach_km': 12.5,
-                        'drive_time_burj_khalifa_min': 20,
-                        'amenity_density_1km': 8,
-                        'momentum_3m': 2.1,
-                        'momentum_6m': 5.5,
-                        'momentum_12m': 10.2,
-                        'roi_pct': 6.5,
-                        'supply_pressure_2y': 1000,
-                        'days_on_market': 45,
-                        'developer_tier': 2,
-                        'project_stage': 0,
-                        'floor_level': 5,
-                        'service_charge_aed': 15,
-                        'has_waterfront_view': 0
-                    })
-                    return mapped_df
-            
-            print("[Ingestion] Live API returned no data or changed schema. Falling back to clean dataset...")
+                    offset += chunk_size
+                    
+                    # Rate Limiting Guard: Sleep for 1 second between requests to respect CKAN limits
+                    time.sleep(1)
+                else:
+                    print(f"[Ingestion] API returned status {response.status_code}. Stopping pagination.")
+                    break
+                    
+            if all_records:
+                df = pd.DataFrame(all_records)
+                print(f"[Ingestion] Successfully downloaded {len(df)} total live transactions.")
+                
+                mapped_df = pd.DataFrame({
+                    'district': df.get('area_name_en', df.get('area', 'JVC')).fillna('JVC'),
+                    'sqft': df.get('property_size_sq_m', 80).astype(float) * 10.764,
+                    '12_month_appreciation_pct': [10.5] * len(df),
+                    'lat': 25.06,
+                    'lng': 55.20,
+                    'distance_to_beach_km': 12.5,
+                    'drive_time_burj_khalifa_min': 20,
+                    'amenity_density_1km': 8,
+                    'momentum_3m': 2.1,
+                    'momentum_6m': 5.5,
+                    'momentum_12m': 10.2,
+                    'roi_pct': 6.5,
+                    'supply_pressure_2y': 1000,
+                    'days_on_market': 45,
+                    'developer_tier': 2,
+                    'project_stage': 0,
+                    'floor_level': 5,
+                    'service_charge_aed': 15,
+                    'has_waterfront_view': 0
+                })
+                return mapped_df
+                
         except Exception as e:
             print(f"[Ingestion] Live API connection failed: {e}. Falling back to clean dataset...")
             
