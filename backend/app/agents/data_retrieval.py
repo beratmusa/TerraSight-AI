@@ -2,36 +2,45 @@ import os
 import pandas as pd
 from typing import Dict, Any
 
+from app.db.supabase_client import get_supabase_client
+
 class DataRetrievalAgent:
     """
     Data Retrieval Subagent
-    Fetches complex GIS and Financial metrics for CatBoost modeling.
+    Fetches complex GIS and Financial metrics for CatBoost modeling from Supabase.
     """
     def __init__(self):
-        self.csv_path = os.path.join(os.getcwd(), "data", "transactions.csv")
+        self.supabase = get_supabase_client()
         
     def fetch_all_features(self, location: str, user_specs: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Fetches all features from CSV for a specific location and merges user specs."""
-        print(f"DataRetrievalAgent: Fetching GIS and financial data for '{location}'...")
+        """Fetches all features from Supabase for a specific location and merges user specs."""
+        print(f"DataRetrievalAgent: Fetching GIS and financial data for '{location}' from Supabase...")
         if user_specs is None:
             user_specs = {}
             
         try:
-            df = pd.read_csv(self.csv_path)
+            if not self.supabase:
+                raise Exception("Supabase client not configured.")
+                
+            # Fetch all transactions to do fuzzy matching in python, 
+            # or in a real scenario, use Supabase text search / ilike
+            # For MVP, fetching all and filtering in pandas is fine since data is small,
+            # but let's query directly with ilike!
+            search_loc = f"%{location}%"
+            response = self.supabase.table("transactions").select("*").ilike("district", search_loc).execute()
             
-            # Fuzzy match: case insensitive and substring
-            # e.g. "Dubai Marina" matches "Marina" in CSV, "Downtown Dubai" matches "Downtown"
-            search_loc = location.lower()
-            mask = df['district'].str.lower().apply(lambda x: x in search_loc or search_loc in x)
-            loc_df = df[mask]
-            
-            if loc_df.empty:
+            data = response.data
+            if not data:
                 print(f"DataRetrievalAgent: WARNING - No data found for '{location}'.")
                 return {"location": location, "error": "No data found"}
                 
-            # For simplicity, taking the mean of all transactions in that district 
-            # to feed into the model as the 'average' property representation
-            avg_all = loc_df.drop(columns=['district', '12_month_appreciation_pct']).mean().to_dict()
+            df = pd.DataFrame(data)
+            
+            # Drop unnecessary columns before taking the mean
+            cols_to_drop = ['id', 'district', '12_month_appreciation_pct', 'transaction_date']
+            df_numeric = df.drop(columns=[c for c in cols_to_drop if c in df.columns])
+            
+            avg_all = df_numeric.mean().to_dict()
             lat = avg_all.pop("lat", 25.06)
             lng = avg_all.pop("lng", 55.20)
             

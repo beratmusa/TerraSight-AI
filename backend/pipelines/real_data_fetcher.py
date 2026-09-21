@@ -105,7 +105,20 @@ class DataIngestionEngine:
             
         return df
 
+from app.db.supabase_client import get_supabase_client
+
 if __name__ == "__main__":
     engine = DataIngestionEngine()
     enriched_df = engine.process_and_enrich_data()
-    print("ETL Process Complete. Data ready to be pushed to Supabase.")
+    print("ETL Process Complete. Pushing to Supabase...")
+    
+    supabase = get_supabase_client()
+    if supabase:
+        records = enriched_df.to_dict(orient="records")
+        try:
+            response = supabase.table("transactions").insert(records).execute()
+            print(f"Successfully pushed {len(response.data)} real transactions to Supabase!")
+        except Exception as e:
+            print(f"Failed to push to Supabase: {e}")
+    else:
+        print("Supabase client not configured. Skipping DB push.")
